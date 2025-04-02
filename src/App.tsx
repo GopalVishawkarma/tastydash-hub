@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
 
 // Pages
+import Index from "./pages/Index";
 import Home from "./pages/Home";
 import Menu from "./pages/Menu";
 import Cart from "./pages/Cart";
@@ -63,7 +64,8 @@ const App = () => {
               <BrowserRouter>
                 <Routes>
                   {/* Public Routes */}
-                  <Route path="/" element={<Home />} />
+                  <Route path="/" element={<Index />} />
+                  <Route path="/home" element={<Home />} />
                   <Route path="/menu" element={<Menu />} />
                   <Route path="/cart" element={<Cart />} />
                   <Route path="/login" element={<Login />} />

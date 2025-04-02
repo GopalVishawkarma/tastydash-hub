@@ -5,10 +5,10 @@ import FoodCard from "@/components/FoodCard";
 import CategoryCard from "@/components/CategoryCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { FoodItem, Category } from "@/types";
 import { Search } from "lucide-react";
+import { getAllFoodItems, getFoodItemsByCategory, getAllCategories } from "@/utils/firebaseUtils";
+import { useToast } from "@/components/ui/use-toast";
 
 const Menu = () => {
   const [foods, setFoods] = useState<FoodItem[]>([]);
@@ -17,43 +17,35 @@ const Menu = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
   
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
+        
         // Fetch categories
-        const categoriesQuery = query(
-          collection(db, "categories"),
-          orderBy("name")
-        );
-        const categoriesSnapshot = await getDocs(categoriesQuery);
-        const categoriesData = categoriesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as Category));
+        const categoriesData = await getAllCategories();
         setCategories([{ id: "all", name: "All Items" }, ...categoriesData]);
         
         // Fetch food items
-        const foodsQuery = query(
-          collection(db, "foods"),
-          orderBy("name")
-        );
-        const foodsSnapshot = await getDocs(foodsQuery);
-        const foodsData = foodsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as FoodItem));
+        const foodsData = await getAllFoodItems();
         setFoods(foodsData);
         setFilteredFoods(foodsData);
       } catch (error) {
         console.error("Error fetching data:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load menu items. Please try again later.",
+        });
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchData();
-  }, []);
+  }, [toast]);
   
   // Apply filters when selectedCategory or searchQuery change
   useEffect(() => {
@@ -137,9 +129,9 @@ const Menu = () => {
           </h2>
           
           {isLoading ? (
-            <div className="food-container">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {[...Array(8)].map((_, index) => (
-                <div key={index} className="food-card animate-pulse">
+                <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
                   <div className="h-48 bg-gray-300 rounded-t-lg"></div>
                   <div className="p-4">
                     <div className="h-6 bg-gray-300 rounded mb-2 w-3/4"></div>
@@ -153,7 +145,7 @@ const Menu = () => {
               ))}
             </div>
           ) : filteredFoods.length > 0 ? (
-            <div className="food-container">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredFoods.map((food) => (
                 <FoodCard key={food.id} food={food} />
               ))}
