@@ -7,70 +7,53 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingBag, Search, RefreshCw, AlertCircle } from "lucide-react";
+import { ShoppingBag, Search, RefreshCw, AlertCircle, Flame } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { getUserOrders } from "@/utils/firebaseUtils";
 import { Order } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useQuery } from "@tanstack/react-query";
 
 const UserOrders = () => {
   const { currentUser } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchOrders = async () => {
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      setError(null);
-      console.log("Fetching orders for user ID:", currentUser.uid);
-      const fetchedOrders = await getUserOrders(currentUser.uid);
-      console.log("Fetched orders:", fetchedOrders);
-      setOrders(fetchedOrders);
-      setFilteredOrders(fetchedOrders);
-    } catch (error) {
-      console.error("Error fetching orders:", error);
-      setError("Failed to load orders. Please try again later.");
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load orders. Please try again later.",
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchOrders();
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setFilteredOrders(orders);
-    } else {
-      const filtered = orders.filter(
-        order => 
-          order.id.toLowerCase().includes(searchTerm.toLowerCase())
+  
+  // Use React Query to fetch and cache orders
+  const {
+    data: orders = [],
+    isLoading,
+    isError,
+    error,
+    refetch
+  } = useQuery({
+    queryKey: ['userOrders', currentUser?.uid],
+    queryFn: async () => {
+      if (!currentUser?.uid) {
+        return [];
+      }
+      console.log('Fetching orders with React Query for user:', currentUser.uid);
+      return getUserOrders(currentUser.uid);
+    },
+    enabled: !!currentUser?.uid,
+    retry: 2,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+  
+  // Filter orders based on search term
+  const filteredOrders = searchTerm.trim() === "" 
+    ? orders 
+    : orders.filter(order => 
+        order.id.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      setFilteredOrders(filtered);
-    }
-  }, [orders, searchTerm]);
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    fetchOrders();
+    refetch();
+    toast({
+      title: "Refreshing orders",
+      description: "Fetching your latest orders...",
+    });
   };
 
   const getOrderStatusStyle = (status: string) => {
@@ -92,7 +75,10 @@ const UserOrders = () => {
     <MainLayout>
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <h1 className="text-2xl font-bold">My Orders</h1>
+          <h1 className="text-2xl font-bold flex items-center">
+            <Flame className="h-6 w-6 mr-2 text-primary" />
+            My Orders
+          </h1>
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
@@ -108,22 +94,26 @@ const UserOrders = () => {
               variant="outline" 
               size="icon" 
               onClick={handleRefresh}
-              disabled={refreshing}
+              disabled={isLoading}
             >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
         
-        {error && (
+        {isError && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              {error instanceof Error 
+                ? error.message 
+                : "Failed to load orders. Please try again later."}
+            </AlertDescription>
           </Alert>
         )}
         
-        {loading ? (
+        {isLoading ? (
           <div className="grid grid-cols-1 gap-4">
             {[...Array(3)].map((_, index) => (
               <div key={index} className="h-24 bg-gray-200 animate-pulse rounded-md"></div>
@@ -132,7 +122,7 @@ const UserOrders = () => {
         ) : filteredOrders.length > 0 ? (
           <div className="grid grid-cols-1 gap-4">
             {filteredOrders.map((order) => (
-              <Card key={order.id} className="overflow-hidden">
+              <Card key={order.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-0">
                   <div className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row justify-between mb-4">
@@ -178,7 +168,7 @@ const UserOrders = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
+          <div className="text-center py-12 bg-white/80 rounded-lg shadow-sm backdrop-blur-sm">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
               <ShoppingBag className="h-8 w-8 text-gray-500" />
             </div>

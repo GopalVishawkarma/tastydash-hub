@@ -172,12 +172,15 @@ export const getAllCategories = async () => {
 // Orders Collection Operations
 export const getOrderById = async (orderId: string) => {
   try {
+    console.log(`Fetching order with ID: ${orderId}`);
     const orderDoc = await getDoc(doc(db, "orders", orderId));
     
     if (orderDoc.exists()) {
+      console.log(`Order found: ${orderId}`, orderDoc.data());
       return { id: orderDoc.id, ...orderDoc.data() } as Order;
     }
     
+    console.error(`Order not found: ${orderId}`);
     throw new Error("Order not found");
   } catch (error) {
     console.error("Error fetching order:", error);
@@ -200,26 +203,40 @@ export const getUserOrders = async (userId: string) => {
       orderBy("createdAt", "desc")
     );
     
+    console.log("Executing query for user orders...");
+    
     const snapshot = await getDocs(ordersQuery);
     console.log(`Found ${snapshot.docs.length} orders for user ${userId}`);
     
     const orders = snapshot.docs.map(doc => {
       const data = doc.data();
-      console.log("Order data:", { id: doc.id, ...data });
-      return { id: doc.id, ...data } as Order;
+      return { 
+        id: doc.id, 
+        ...data,
+        createdAt: data.createdAt
+      } as Order;
     });
     
+    console.log("Processed orders:", orders);
     return orders;
   } catch (error) {
     console.error("Error fetching user orders:", error);
-    throw error;
+    throw new Error(`Failed to fetch user orders: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
 export const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
   try {
+    console.log(`Updating order ${orderId} status to ${status}`);
     const orderRef = doc(db, "orders", orderId);
+    
+    const orderDoc = await getDoc(orderRef);
+    if (!orderDoc.exists()) {
+      throw new Error(`Order ${orderId} not found`);
+    }
+    
     await updateDoc(orderRef, { status });
+    console.log(`Successfully updated order ${orderId} status to ${status}`);
     
     return { id: orderId, status };
   } catch (error) {
@@ -228,12 +245,10 @@ export const updateOrderStatus = async (orderId: string, status: OrderStatus) =>
   }
 };
 
-// Add a new function to create orders
 export const createOrder = async (orderData: Omit<Order, 'id' | 'createdAt'>) => {
   try {
     console.log("Creating new order:", orderData);
     
-    // Add document to Firestore
     const docRef = await addDoc(collection(db, "orders"), {
       ...orderData,
       createdAt: serverTimestamp(),
@@ -248,7 +263,6 @@ export const createOrder = async (orderData: Omit<Order, 'id' | 'createdAt'>) =>
   }
 };
 
-// Get all orders (for admin)
 export const getAllOrders = async () => {
   try {
     const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"));

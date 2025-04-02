@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, User, LogOut, Menu as MenuIcon } from "lucide-react";
+import { ShoppingCart, User, LogOut, Menu as MenuIcon, Flame } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -23,12 +23,18 @@ const MainLayout = ({ children }: MainLayoutProps) => {
   const getTotalItems = cart?.getTotalItems || (() => 0);
   
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="bg-white shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-amber-50 to-white bg-fixed bg-no-repeat">
+      <div 
+        className="absolute inset-0 opacity-10 pointer-events-none z-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/lovable-uploads/dff6cd92-5cc1-4fde-8c6f-fb50a0b17822.png')" }}
+      />
+      
+      <header className="bg-white/90 backdrop-blur-sm shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-8">
-            <Link to="/" className="text-2xl font-bold text-primary">
-              TastyDash
+            <Link to="/" className="text-2xl font-bold text-primary flex items-center">
+              <Flame className="h-6 w-6 mr-2" />
+              Flames
             </Link>
             
             <nav className="hidden md:flex space-x-6">
@@ -103,8 +109,9 @@ const MainLayout = ({ children }: MainLayoutProps) => {
               </SheetTrigger>
               <SheetContent side="right">
                 <div className="flex flex-col space-y-6 py-4">
-                  <Link to="/" className="text-xl font-semibold text-primary">
-                    TastyDash
+                  <Link to="/" className="text-xl font-semibold text-primary flex items-center">
+                    <Flame className="h-5 w-5 mr-2" />
+                    Flames
                   </Link>
                   
                   <nav className="flex flex-col space-y-4">
@@ -153,15 +160,18 @@ const MainLayout = ({ children }: MainLayoutProps) => {
         </div>
       </header>
       
-      <main className="flex-grow">
+      <main className="flex-grow relative z-10">
         {children}
       </main>
       
-      <footer className="bg-gray-800 text-white py-8">
+      <footer className="bg-gray-800 text-white py-8 relative z-10">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
-              <h3 className="text-xl font-bold mb-4">TastyDash</h3>
+              <h3 className="text-xl font-bold mb-4 flex items-center">
+                <Flame className="h-5 w-5 mr-2" />
+                Flames
+              </h3>
               <p className="text-gray-300">
                 Delicious food delivered to your doorstep.
               </p>
@@ -188,13 +198,13 @@ const MainLayout = ({ children }: MainLayoutProps) => {
               <p className="text-gray-300">
                 123 Food Street<br />
                 Tasty City, India<br />
-                contact@tastydash.com
+                contact@flames.com
               </p>
             </div>
           </div>
           
           <div className="border-t border-gray-700 mt-8 pt-6 text-center text-gray-400">
-            <p>&copy; {new Date().getFullYear()} TastyDash. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Flames. All rights reserved.</p>
           </div>
         </div>
       </footer>

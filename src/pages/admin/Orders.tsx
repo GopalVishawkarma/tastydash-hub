@@ -1,24 +1,18 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  collection,
-  query,
-  getDocs,
-  orderBy,
-  doc,
-  updateDoc,
-  where,
-  Timestamp
-} from "firebase/firestore";
+import { doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Order, OrderStatus } from "@/types";
 import { useToast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
-import { Search, Filter } from "lucide-react";
+import { Search, Flame } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { formatCurrency } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { getAllOrders } from "@/utils/firebaseUtils";
 import {
   Select,
   SelectContent,
@@ -26,85 +20,60 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency } from "@/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const AdminOrders = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const ordersQuery = query(
-          collection(db, "orders"),
-          orderBy("createdAt", "desc")
-        );
-        const querySnapshot = await getDocs(ordersQuery);
-        const fetchedOrders: Order[] = [];
-        
-        querySnapshot.forEach((doc) => {
-          fetchedOrders.push({ 
-            id: doc.id, 
-            ...doc.data() 
-          } as Order);
-        });
-        
-        setOrders(fetchedOrders);
-        setFilteredOrders(fetchedOrders);
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load orders. Please try again later.",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchOrders();
-  }, [toast]);
+  // Use React Query to fetch and cache orders
+  const {
+    data: orders = [],
+    isLoading,
+    isError,
+    error,
+    refetch
+  } = useQuery({
+    queryKey: ['adminOrders'],
+    queryFn: getAllOrders,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-  useEffect(() => {
-    let result = orders;
+  // Apply filters
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = searchTerm.trim() === "" || 
+      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.userName && order.userName.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    // Apply search filter
-    if (searchTerm) {
-      result = result.filter(
-        order => 
-          order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.userName.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     
-    // Apply status filter
-    if (statusFilter !== "all") {
-      result = result.filter(order => order.status === statusFilter);
-    }
-    
-    setFilteredOrders(result);
-  }, [orders, searchTerm, statusFilter]);
+    return matchesSearch && matchesStatus;
+  });
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
+      // First verify the order exists
       const orderRef = doc(db, "orders", orderId);
+      const orderDoc = await getDoc(orderRef);
+      
+      if (!orderDoc.exists()) {
+        toast({
+          variant: "destructive",
+          title: "Order Not Found",
+          description: `Could not find order with ID ${orderId}`,
+        });
+        return;
+      }
+      
+      // Update the status
       await updateDoc(orderRef, {
         status: newStatus
       });
       
-      // Update local state
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId 
-            ? { ...order, status: newStatus } 
-            : order
-        )
-      );
+      // Refresh the data
+      refetch();
       
       toast({
         title: "Order Updated",
@@ -124,7 +93,10 @@ const AdminOrders = () => {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-2xl font-bold">Manage Orders</h1>
+          <h1 className="text-2xl font-bold flex items-center">
+            <Flame className="h-6 w-6 mr-2 text-primary" />
+            Manage Orders
+          </h1>
           
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <div className="relative w-full sm:w-64">
@@ -155,7 +127,19 @@ const AdminOrders = () => {
           </div>
         </div>
         
-        {loading ? (
+        {isError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              {error instanceof Error 
+                ? error.message 
+                : "Failed to load orders. Please try again later."}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {isLoading ? (
           <div className="grid grid-cols-1 gap-4">
             {[...Array(3)].map((_, index) => (
               <div key={index} className="h-24 bg-gray-200 animate-pulse rounded-md"></div>
@@ -164,7 +148,7 @@ const AdminOrders = () => {
         ) : filteredOrders.length > 0 ? (
           <div className="grid grid-cols-1 gap-4">
             {filteredOrders.map((order) => (
-              <Card key={order.id} className="overflow-hidden">
+              <Card key={order.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-0">
                   <div className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row justify-between mb-4">
@@ -175,7 +159,9 @@ const AdminOrders = () => {
                         <p className="text-sm text-gray-500">
                           {order.createdAt instanceof Timestamp
                             ? new Date(order.createdAt.toDate()).toLocaleString()
-                            : "N/A"}
+                            : order.createdAt
+                              ? new Date(order.createdAt).toLocaleString()
+                              : "N/A"}
                         </p>
                       </div>
                       <div className="mt-2 sm:mt-0">
@@ -249,7 +235,7 @@ const AdminOrders = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
+          <div className="text-center py-12 bg-white/80 rounded-lg shadow-sm backdrop-blur-sm">
             <p className="text-gray-500">No orders found.</p>
           </div>
         )}
