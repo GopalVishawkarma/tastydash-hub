@@ -1,0 +1,182 @@
+
+import React, { useState, useEffect } from "react";
+import MainLayout from "@/components/layout/MainLayout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  collection,
+  query,
+  getDocs,
+  where,
+  orderBy,
+  Timestamp
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Order } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
+import { Link } from "react-router-dom";
+import { formatCurrency } from "@/lib/utils";
+import { ShoppingBag, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+
+const UserOrders = () => {
+  const { currentUser } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!currentUser) return;
+      
+      try {
+        const ordersQuery = query(
+          collection(db, "orders"),
+          where("userId", "==", currentUser.uid),
+          orderBy("createdAt", "desc")
+        );
+        const querySnapshot = await getDocs(ordersQuery);
+        const fetchedOrders: Order[] = [];
+        
+        querySnapshot.forEach((doc) => {
+          fetchedOrders.push({ 
+            id: doc.id, 
+            ...doc.data() 
+          } as Order);
+        });
+        
+        setOrders(fetchedOrders);
+        setFilteredOrders(fetchedOrders);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load orders. Please try again later.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchOrders();
+  }, [currentUser, toast]);
+
+  useEffect(() => {
+    if (searchTerm.trim() === "") {
+      setFilteredOrders(orders);
+    } else {
+      const filtered = orders.filter(
+        order => 
+          order.id.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredOrders(filtered);
+    }
+  }, [orders, searchTerm]);
+
+  const getOrderStatusStyle = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "confirmed":
+        return "bg-blue-100 text-blue-800";
+      case "delivered":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  return (
+    <MainLayout>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <h1 className="text-2xl font-bold">My Orders</h1>
+          
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              placeholder="Search orders..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4">
+            {[...Array(3)].map((_, index) => (
+              <div key={index} className="h-24 bg-gray-200 animate-pulse rounded-md"></div>
+            ))}
+          </div>
+        ) : filteredOrders.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4">
+            {filteredOrders.map((order) => (
+              <Card key={order.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row justify-between mb-4">
+                      <div>
+                        <h3 className="font-medium">
+                          Order #{order.id.slice(0, 8)}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {order.createdAt instanceof Timestamp
+                            ? new Date(order.createdAt.toDate()).toLocaleString()
+                            : "N/A"}
+                        </p>
+                      </div>
+                      <div className="mt-2 sm:mt-0">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getOrderStatusStyle(order.status)}`}
+                        >
+                          {order.status}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                      <div>
+                        <p className="text-sm">
+                          <span className="font-medium">Total:</span> {formatCurrency(order.totalAmount)}
+                        </p>
+                        <p className="text-sm">
+                          <span className="font-medium">Items:</span> {order.items.length}
+                        </p>
+                      </div>
+                      
+                      <Link to={`/my-orders/${order.id}`} className="mt-3 sm:mt-0">
+                        <Button size="sm" variant="outline">
+                          View Details
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+              <ShoppingBag className="h-8 w-8 text-gray-500" />
+            </div>
+            <h2 className="text-xl font-bold mb-2">No orders yet</h2>
+            <p className="text-gray-500 mb-4">You haven't placed any orders yet.</p>
+            <Link to="/menu">
+              <Button>Browse Menu</Button>
+            </Link>
+          </div>
+        )}
+      </div>
+    </MainLayout>
+  );
+};
+
+export default UserOrders;
