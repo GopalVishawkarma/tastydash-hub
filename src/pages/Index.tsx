@@ -15,8 +15,11 @@ const Index = () => {
   useEffect(() => {
     const fetchFeaturedItems = async () => {
       try {
+        console.log("Fetching featured items for Index page...");
         const items = await getFeaturedFoodItems();
-        setFeaturedItems(items.slice(0, 4)); // Get just the first 4 featured items
+        console.log("Featured items on Index page:", items);
+        // Get just the first 4 featured items if more exist
+        setFeaturedItems(items.slice(0, 4)); 
       } catch (error) {
         console.error("Error fetching featured items:", error);
       } finally {

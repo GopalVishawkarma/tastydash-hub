@@ -4,8 +4,7 @@ import { Link } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import FoodCard from "@/components/FoodCard";
 import { Button } from "@/components/ui/button";
-import { collection, getDocs, query, where, limit, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getFeaturedFoodItems, getAllFoodItems } from "@/utils/firebaseUtils";
 import { FoodItem } from "@/types";
 import { ArrowRight } from "lucide-react";
 
@@ -17,31 +16,23 @@ const Home = () => {
   useEffect(() => {
     const fetchFoodItems = async () => {
       try {
+        console.log("Fetching food items for home page...");
+        
         // Fetch featured items
-        const featuredQuery = query(
-          collection(db, "foods"),
-          where("featured", "==", true),
-          limit(4)
-        );
-        const featuredSnapshot = await getDocs(featuredQuery);
-        const featuredData = featuredSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as FoodItem));
+        const featuredData = await getFeaturedFoodItems();
+        console.log("Featured items:", featuredData);
         setFeaturedItems(featuredData);
         
-        // Fetch popular items
-        const popularQuery = query(
-          collection(db, "foods"),
-          orderBy("createdAt", "desc"),
-          limit(8)
-        );
-        const popularSnapshot = await getDocs(popularQuery);
-        const popularData = popularSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as FoodItem));
-        setPopularItems(popularData);
+        // Fetch popular/recent items
+        const allItems = await getAllFoodItems();
+        // Sort by createdAt (newest first) and take first 8
+        const sortedItems = [...allItems].sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        }).slice(0, 8);
+        
+        setPopularItems(sortedItems);
       } catch (error) {
         console.error("Error fetching food items:", error);
       } finally {
@@ -82,44 +73,46 @@ const Home = () => {
       </section>
       
       {/* Featured Items Section */}
-      <section className="py-14">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold">Featured Dishes</h2>
-            <Link to="/menu" className="text-primary hover:underline flex items-center">
-              View All <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </div>
-          
-          {isLoading ? (
-            <div className="food-container">
-              {[...Array(4)].map((_, index) => (
-                <div key={index} className="food-card animate-pulse">
-                  <div className="h-48 bg-gray-300 rounded-t-lg"></div>
-                  <div className="p-4">
-                    <div className="h-6 bg-gray-300 rounded mb-2 w-3/4"></div>
-                    <div className="h-4 bg-gray-200 rounded mb-3 w-full"></div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <div className="h-6 bg-gray-300 rounded w-1/4"></div>
-                      <div className="h-8 bg-gray-300 rounded w-20"></div>
+      {(isLoading || featuredItems.length > 0) && (
+        <section className="py-14">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold">Featured Dishes</h2>
+              <Link to="/menu" className="text-primary hover:underline flex items-center">
+                View All <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </div>
+            
+            {isLoading ? (
+              <div className="food-container">
+                {[...Array(4)].map((_, index) => (
+                  <div key={index} className="food-card animate-pulse">
+                    <div className="h-48 bg-gray-300 rounded-t-lg"></div>
+                    <div className="p-4">
+                      <div className="h-6 bg-gray-300 rounded mb-2 w-3/4"></div>
+                      <div className="h-4 bg-gray-200 rounded mb-3 w-full"></div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="h-6 bg-gray-300 rounded w-1/4"></div>
+                        <div className="h-8 bg-gray-300 rounded w-20"></div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : featuredItems.length > 0 ? (
-            <div className="food-container">
-              {featuredItems.map((item) => (
-                <FoodCard key={item.id} food={item} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-10">
-              <p className="text-gray-500">No featured items available yet.</p>
-            </div>
-          )}
-        </div>
-      </section>
+                ))}
+              </div>
+            ) : featuredItems.length > 0 ? (
+              <div className="food-container">
+                {featuredItems.map((item) => (
+                  <FoodCard key={item.id} food={item} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-gray-500">No featured items available yet.</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
       
       {/* How It Works Section */}
       <section className="py-14 bg-gray-50">

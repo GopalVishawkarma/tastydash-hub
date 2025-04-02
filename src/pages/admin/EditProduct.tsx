@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminLayout from "@/components/layout/AdminLayout";
@@ -7,8 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { useToast } from "@/components/ui/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,10 +24,7 @@ const formSchema = z.object({
   price: z.coerce.number().positive("Price must be positive"),
   category: z.string().min(1, "Category is required"),
   featured: z.boolean().default(false),
-  image: z.instanceof(FileList).refine(
-    (files) => files.length === 0 || (files.length === 1 && files[0].type.startsWith("image/")),
-    "Please upload a valid image file"
-  ).optional(),
+  image: z.string().url("Please enter a valid image URL").or(z.string().length(0)),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -39,7 +36,6 @@ const AdminEditProduct = () => {
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [existingImageUrl, setExistingImageUrl] = useState<string>("");
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -49,6 +45,7 @@ const AdminEditProduct = () => {
       price: 0,
       category: "",
       featured: false,
+      image: "",
     },
   });
   
@@ -67,10 +64,10 @@ const AdminEditProduct = () => {
             price: productData.price,
             category: productData.category,
             featured: productData.featured,
+            image: productData.image,
           });
           
           if (productData.image) {
-            setExistingImageUrl(productData.image);
             setImagePreview(productData.image);
           }
         } else {
@@ -96,22 +93,8 @@ const AdminEditProduct = () => {
     fetchProductDetails();
   }, [id, navigate, toast, form]);
   
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      // Create a preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else if (existingImageUrl) {
-      // If no new file is selected, keep showing the existing image
-      setImagePreview(existingImageUrl);
-    } else {
-      setImagePreview(null);
-    }
+  const handleImageUrlChange = (url: string) => {
+    setImagePreview(url || null);
   };
   
   const onSubmit = async (data: FormValues) => {
@@ -120,16 +103,6 @@ const AdminEditProduct = () => {
     setUploading(true);
     
     try {
-      let imageUrl = existingImageUrl;
-      
-      // Upload new image if provided
-      if (data.image && data.image.length > 0) {
-        const file = data.image[0];
-        const imageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, file);
-        imageUrl = await getDownloadURL(imageRef);
-      }
-      
       // Update document in Firestore
       await updateDoc(doc(db, "foodItems", id), {
         name: data.name,
@@ -137,7 +110,7 @@ const AdminEditProduct = () => {
         price: data.price,
         category: data.category,
         featured: data.featured,
-        image: imageUrl,
+        image: data.image,
       });
       
       toast({
@@ -282,22 +255,19 @@ const AdminEditProduct = () => {
                 <FormField
                   control={form.control}
                   name="image"
-                  render={({ field: { value, onChange, ...fieldProps } }) => (
+                  render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Product Image</FormLabel>
+                      <FormLabel>Product Image URL</FormLabel>
                       <FormControl>
                         <div className="space-y-3">
-                          <div className="flex items-center gap-4">
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                onChange(e.target.files);
-                                handleImageChange(e);
-                              }}
-                              {...fieldProps}
-                            />
-                          </div>
+                          <Input
+                            placeholder="Enter image URL"
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              handleImageUrlChange(e.target.value);
+                            }}
+                          />
                           
                           <div className="flex justify-center">
                             {imagePreview ? (
@@ -306,22 +276,18 @@ const AdminEditProduct = () => {
                                   src={imagePreview}
                                   alt="Preview"
                                   className="h-full w-full object-cover"
+                                  onError={() => setImagePreview(null)}
                                 />
                               </div>
                             ) : (
                               <div className="flex flex-col items-center justify-center h-40 w-40 border rounded-md text-gray-400">
                                 <ImagePlus className="h-10 w-10 mb-2" />
                                 <span className="text-xs text-center">
-                                  Upload an image
+                                  Image preview will appear here
                                 </span>
                               </div>
                             )}
                           </div>
-                          {existingImageUrl && (
-                            <p className="text-xs text-gray-500 text-center">
-                              Leave empty to keep the existing image
-                            </p>
-                          )}
                         </div>
                       </FormControl>
                       <FormMessage />
