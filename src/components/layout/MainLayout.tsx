@@ -16,8 +16,11 @@ interface MainLayoutProps {
 }
 
 const MainLayout = ({ children }: MainLayoutProps) => {
-  const { currentUser, isAdmin, logout } = useAuth();
-  const { getTotalItems } = useCart();
+  // Try to access auth context, but handle case where it might not be available yet
+  const auth = useAuth();
+  const { currentUser, isAdmin, logout } = auth || { currentUser: null, isAdmin: false, logout: () => {} };
+  const cart = useCart();
+  const getTotalItems = cart?.getTotalItems || (() => 0);
   
   return (
     <div className="min-h-screen flex flex-col">

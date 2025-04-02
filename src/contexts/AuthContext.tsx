@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import {
   User,
@@ -129,7 +128,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   useEffect(() => {
+    console.log("Auth Provider mounting...");
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("Auth state changed:", user ? `User: ${user.email}` : "No user");
       setCurrentUser(user);
       
       if (user) {
@@ -201,6 +202,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     logout,
     resetPassword
   };
+
+  console.log("Rendering AuthProvider, loading:", loading);
 
   return (
     <AuthContext.Provider value={value}>
