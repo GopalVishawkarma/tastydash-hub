@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -32,6 +33,7 @@ import UserProfile from "./pages/user/Profile";
 import UserOrders from "./pages/user/Orders";
 import UserOrderDetails from "./pages/user/OrderDetails";
 
+// Create a new query client instance outside the component
 const queryClient = new QueryClient();
 
 // Protected Route Component
@@ -49,95 +51,99 @@ const ProtectedRoute = ({ children, requireAdmin = false }: { children: JSX.Elem
   return children;
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <CartProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Home />} />
-              <Route path="/menu" element={<Menu />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              
-              {/* Protected User Routes */}
-              <Route path="/checkout" element={
-                <ProtectedRoute>
-                  <Checkout />
-                </ProtectedRoute>
-              } />
-              <Route path="/order-success" element={
-                <ProtectedRoute>
-                  <OrderSuccess />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <UserProfile />
-                </ProtectedRoute>
-              } />
-              <Route path="/my-orders" element={
-                <ProtectedRoute>
-                  <UserOrders />
-                </ProtectedRoute>
-              } />
-              <Route path="/my-orders/:id" element={
-                <ProtectedRoute>
-                  <UserOrderDetails />
-                </ProtectedRoute>
-              } />
-              
-              {/* Protected Admin Routes */}
-              <Route path="/admin" element={
-                <ProtectedRoute requireAdmin>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/orders" element={
-                <ProtectedRoute requireAdmin>
-                  <AdminOrders />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/orders/:id" element={
-                <ProtectedRoute requireAdmin>
-                  <AdminOrderDetails />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/products" element={
-                <ProtectedRoute requireAdmin>
-                  <AdminProducts />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/products/add" element={
-                <ProtectedRoute requireAdmin>
-                  <AdminAddProduct />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/products/edit/:id" element={
-                <ProtectedRoute requireAdmin>
-                  <AdminEditProduct />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/users" element={
-                <ProtectedRoute requireAdmin>
-                  <AdminUsers />
-                </ProtectedRoute>
-              } />
-              
-              {/* Catch-all route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </CartProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  return (
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <CartProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  {/* Public Routes */}
+                  <Route path="/" element={<Home />} />
+                  <Route path="/menu" element={<Menu />} />
+                  <Route path="/cart" element={<Cart />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  
+                  {/* Protected User Routes */}
+                  <Route path="/checkout" element={
+                    <ProtectedRoute>
+                      <Checkout />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/order-success" element={
+                    <ProtectedRoute>
+                      <OrderSuccess />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <UserProfile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/my-orders" element={
+                    <ProtectedRoute>
+                      <UserOrders />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/my-orders/:id" element={
+                    <ProtectedRoute>
+                      <UserOrderDetails />
+                    </ProtectedRoute>
+                  } />
+                  
+                  {/* Protected Admin Routes */}
+                  <Route path="/admin" element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/orders" element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminOrders />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/orders/:id" element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminOrderDetails />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/products" element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminProducts />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/products/add" element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminAddProduct />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/products/edit/:id" element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminEditProduct />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/users" element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminUsers />
+                    </ProtectedRoute>
+                  } />
+                  
+                  {/* Catch-all route */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </CartProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </React.StrictMode>
+  );
+};
 
 export default App;
