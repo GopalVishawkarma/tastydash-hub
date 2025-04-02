@@ -12,16 +12,18 @@ import {
 } from "@/components/ui/card";
 import { Order } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
-import { ChevronLeft, CheckCircle, XCircle, Clock, Truck, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ChevronLeft, CheckCircle, XCircle, Clock, Truck, RefreshCw, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { getOrderById } from "@/utils/firebaseUtils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const UserOrderDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { currentUser } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
@@ -30,10 +32,14 @@ const UserOrderDetails = () => {
     
     try {
       setLoading(true);
+      setError(null);
+      console.log("Fetching order details for ID:", id);
       const orderData = await getOrderById(id);
+      console.log("Fetched order data:", orderData);
       
       // Verify this order belongs to the current user
       if (orderData.userId !== currentUser.uid) {
+        setError("You don't have permission to view this order.");
         toast({
           variant: "destructive",
           title: "Access Denied",
@@ -45,6 +51,7 @@ const UserOrderDetails = () => {
       }
     } catch (error) {
       console.error("Error fetching order details:", error);
+      setError("Failed to load order details. Please try again later.");
       toast({
         variant: "destructive",
         title: "Error",
@@ -58,7 +65,7 @@ const UserOrderDetails = () => {
 
   useEffect(() => {
     fetchOrderDetails();
-  }, [id, currentUser, toast]);
+  }, [id, currentUser]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -103,6 +110,28 @@ const UserOrderDetails = () => {
             <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
             <div className="h-64 bg-gray-200 rounded mb-4"></div>
             <div className="h-32 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto px-4 py-8">
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          
+          <div className="text-center py-8">
+            <h2 className="text-xl font-bold mb-2">Something went wrong</h2>
+            <p className="text-gray-500 mb-4">{error}</p>
+            <Link to="/my-orders">
+              <Button>Back to My Orders</Button>
+            </Link>
           </div>
         </div>
       </MainLayout>

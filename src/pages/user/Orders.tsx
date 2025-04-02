@@ -4,34 +4,43 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingBag, Search, RefreshCw } from "lucide-react";
+import { ShoppingBag, Search, RefreshCw, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { getUserOrders } from "@/utils/firebaseUtils";
 import { Order } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const UserOrders = () => {
   const { currentUser } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchOrders = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
+      setError(null);
+      console.log("Fetching orders for user ID:", currentUser.uid);
       const fetchedOrders = await getUserOrders(currentUser.uid);
+      console.log("Fetched orders:", fetchedOrders);
       setOrders(fetchedOrders);
       setFilteredOrders(fetchedOrders);
     } catch (error) {
       console.error("Error fetching orders:", error);
+      setError("Failed to load orders. Please try again later.");
       toast({
         variant: "destructive",
         title: "Error",
@@ -45,7 +54,7 @@ const UserOrders = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, [currentUser, toast]);
+  }, [currentUser]);
 
   useEffect(() => {
     if (searchTerm.trim() === "") {
@@ -105,6 +114,14 @@ const UserOrders = () => {
             </Button>
           </div>
         </div>
+        
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         
         {loading ? (
           <div className="grid grid-cols-1 gap-4">

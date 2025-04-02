@@ -187,17 +187,29 @@ export const getOrderById = async (orderId: string) => {
 
 export const getUserOrders = async (userId: string) => {
   try {
+    console.log("Fetching orders for user:", userId);
+    
+    if (!userId) {
+      console.error("getUserOrders called with empty userId");
+      return [];
+    }
+
     const ordersQuery = query(
       collection(db, "orders"),
       where("userId", "==", userId),
       orderBy("createdAt", "desc")
     );
-    const snapshot = await getDocs(ordersQuery);
     
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Order));
+    const snapshot = await getDocs(ordersQuery);
+    console.log(`Found ${snapshot.docs.length} orders for user ${userId}`);
+    
+    const orders = snapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log("Order data:", { id: doc.id, ...data });
+      return { id: doc.id, ...data } as Order;
+    });
+    
+    return orders;
   } catch (error) {
     console.error("Error fetching user orders:", error);
     throw error;
@@ -212,6 +224,42 @@ export const updateOrderStatus = async (orderId: string, status: OrderStatus) =>
     return { id: orderId, status };
   } catch (error) {
     console.error("Error updating order status:", error);
+    throw error;
+  }
+};
+
+// Add a new function to create orders
+export const createOrder = async (orderData: Omit<Order, 'id' | 'createdAt'>) => {
+  try {
+    console.log("Creating new order:", orderData);
+    
+    // Add document to Firestore
+    const docRef = await addDoc(collection(db, "orders"), {
+      ...orderData,
+      createdAt: serverTimestamp(),
+    });
+    
+    console.log("Order created successfully with ID:", docRef.id);
+    
+    return { id: docRef.id, ...orderData, createdAt: new Date() };
+  } catch (error) {
+    console.error("Error creating order:", error);
+    throw error;
+  }
+};
+
+// Get all orders (for admin)
+export const getAllOrders = async () => {
+  try {
+    const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(ordersQuery);
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Order));
+  } catch (error) {
+    console.error("Error fetching all orders:", error);
     throw error;
   }
 };
