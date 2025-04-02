@@ -3,22 +3,15 @@ import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  collection,
-  query,
-  getDocs,
-  where,
-  orderBy,
-  Timestamp
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { Order } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
 import { formatCurrency } from "@/lib/utils";
-import { ShoppingBag, Search } from "lucide-react";
+import { ShoppingBag, Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { getUserOrders } from "@/utils/firebaseUtils";
+import { Order } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 const UserOrders = () => {
   const { currentUser } = useAuth();
@@ -27,41 +20,30 @@ const UserOrders = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchOrders = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setLoading(true);
+      const fetchedOrders = await getUserOrders(currentUser.uid);
+      setOrders(fetchedOrders);
+      setFilteredOrders(fetchedOrders);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load orders. Please try again later.",
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      if (!currentUser) return;
-      
-      try {
-        const ordersQuery = query(
-          collection(db, "orders"),
-          where("userId", "==", currentUser.uid),
-          orderBy("createdAt", "desc")
-        );
-        const querySnapshot = await getDocs(ordersQuery);
-        const fetchedOrders: Order[] = [];
-        
-        querySnapshot.forEach((doc) => {
-          fetchedOrders.push({ 
-            id: doc.id, 
-            ...doc.data() 
-          } as Order);
-        });
-        
-        setOrders(fetchedOrders);
-        setFilteredOrders(fetchedOrders);
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load orders. Please try again later.",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchOrders();
   }, [currentUser, toast]);
 
@@ -76,6 +58,11 @@ const UserOrders = () => {
       setFilteredOrders(filtered);
     }
   }, [orders, searchTerm]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchOrders();
+  };
 
   const getOrderStatusStyle = (status: string) => {
     switch (status) {
@@ -98,14 +85,24 @@ const UserOrders = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-2xl font-bold">My Orders</h1>
           
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Search orders..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search orders..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
         
@@ -127,17 +124,18 @@ const UserOrders = () => {
                           Order #{order.id.slice(0, 8)}
                         </h3>
                         <p className="text-sm text-gray-500">
-                          {order.createdAt instanceof Timestamp
-                            ? new Date(order.createdAt.toDate()).toLocaleString()
+                          {order.createdAt ? 
+                            new Date(order.createdAt.toDate ? order.createdAt.toDate() : order.createdAt).toLocaleString() 
                             : "N/A"}
                         </p>
                       </div>
                       <div className="mt-2 sm:mt-0">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getOrderStatusStyle(order.status)}`}
+                        <Badge 
+                          variant="outline"
+                          className={`${getOrderStatusStyle(order.status)}`}
                         >
                           {order.status}
-                        </span>
+                        </Badge>
                       </div>
                     </div>
                     

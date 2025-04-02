@@ -10,67 +10,60 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import {
-  doc,
-  getDoc,
-  Timestamp
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Order } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
-import { ChevronLeft, CheckCircle, XCircle, Clock, Truck } from "lucide-react";
+import { ChevronLeft, CheckCircle, XCircle, Clock, Truck, RefreshCw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { getOrderById } from "@/utils/firebaseUtils";
 
 const UserOrderDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { currentUser } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchOrderDetails = async () => {
-      if (!id || !currentUser) return;
+  const fetchOrderDetails = async () => {
+    if (!id || !currentUser) return;
+    
+    try {
+      setLoading(true);
+      const orderData = await getOrderById(id);
       
-      try {
-        const orderDoc = await getDoc(doc(db, "orders", id));
-        
-        if (orderDoc.exists()) {
-          const orderData = orderDoc.data() as Order;
-          
-          // Verify this order belongs to the current user
-          if (orderData.userId !== currentUser.uid) {
-            toast({
-              variant: "destructive",
-              title: "Access Denied",
-              description: "You don't have permission to view this order.",
-            });
-            setOrder(null);
-          } else {
-            setOrder({ id: orderDoc.id, ...orderData });
-          }
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Order not found.",
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching order details:", error);
+      // Verify this order belongs to the current user
+      if (orderData.userId !== currentUser.uid) {
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Failed to load order details. Please try again later.",
+          title: "Access Denied",
+          description: "You don't have permission to view this order.",
         });
-      } finally {
-        setLoading(false);
+        setOrder(null);
+      } else {
+        setOrder(orderData);
       }
-    };
-    
+    } catch (error) {
+      console.error("Error fetching order details:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load order details. Please try again later.",
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     fetchOrderDetails();
   }, [id, currentUser, toast]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchOrderDetails();
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -142,6 +135,16 @@ const UserOrderDetails = () => {
             </Button>
           </Link>
           <h1 className="text-2xl font-bold">Order Details</h1>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="ml-auto"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-1 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -156,8 +159,8 @@ const UserOrderDetails = () => {
                     <div>
                       <h3 className="text-sm font-medium text-gray-500">Order Date</h3>
                       <p>
-                        {order.createdAt instanceof Timestamp
-                          ? new Date(order.createdAt.toDate()).toLocaleString()
+                        {order.createdAt ? 
+                          new Date(order.createdAt.toDate ? order.createdAt.toDate() : order.createdAt).toLocaleString() 
                           : "N/A"}
                       </p>
                     </div>

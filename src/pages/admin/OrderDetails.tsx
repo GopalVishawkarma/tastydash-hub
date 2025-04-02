@@ -10,16 +10,9 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  Timestamp
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Order, OrderStatus } from "@/types";
 import { useToast } from "@/components/ui/use-toast";
-import { ChevronLeft, CheckCircle, XCircle, Clock, Truck } from "lucide-react";
+import { ChevronLeft, CheckCircle, XCircle, Clock, Truck, RefreshCw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { 
   Select,
@@ -28,52 +21,51 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { updateOrderStatus, getOrderById } from "@/utils/firebaseUtils";
 
 const AdminOrderDetails = () => {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchOrderDetails = async () => {
-      if (!id) return;
-      
-      try {
-        const orderDoc = await getDoc(doc(db, "orders", id));
-        
-        if (orderDoc.exists()) {
-          setOrder({ id: orderDoc.id, ...orderDoc.data() } as Order);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Order not found.",
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching order details:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load order details. Please try again later.",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchOrderDetails = async () => {
+    if (!id) return;
     
+    try {
+      setLoading(true);
+      const orderData = await getOrderById(id);
+      setOrder(orderData);
+    } catch (error) {
+      console.error("Error fetching order details:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load order details. Please try again later.",
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     fetchOrderDetails();
   }, [id, toast]);
 
-  const updateOrderStatus = async (newStatus: OrderStatus) => {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchOrderDetails();
+  };
+
+  const handleUpdateStatus = async (newStatus: OrderStatus) => {
     if (!id || !order) return;
     
     try {
-      const orderRef = doc(db, "orders", id);
-      await updateDoc(orderRef, {
-        status: newStatus
-      });
+      setIsUpdating(true);
+      await updateOrderStatus(id, newStatus);
       
       // Update local state
       setOrder({ ...order, status: newStatus });
@@ -89,6 +81,8 @@ const AdminOrderDetails = () => {
         title: "Update Failed",
         description: "Could not update order status. Please try again.",
       });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -143,6 +137,16 @@ const AdminOrderDetails = () => {
             </Button>
           </Link>
           <h1 className="text-2xl font-bold">Order Details</h1>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="ml-auto"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-1 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -157,8 +161,8 @@ const AdminOrderDetails = () => {
                     <div>
                       <h3 className="text-sm font-medium text-gray-500">Order Date</h3>
                       <p>
-                        {order.createdAt instanceof Timestamp
-                          ? new Date(order.createdAt.toDate()).toLocaleString()
+                        {order.createdAt ? 
+                          new Date(order.createdAt.toDate ? order.createdAt.toDate() : order.createdAt).toLocaleString() 
                           : "N/A"}
                       </p>
                     </div>
@@ -266,8 +270,8 @@ const AdminOrderDetails = () => {
                   </label>
                   <Select
                     value={order.status}
-                    onValueChange={(value) => updateOrderStatus(value as OrderStatus)}
-                    disabled={order.status === "delivered" || order.status === "cancelled"}
+                    onValueChange={(value) => handleUpdateStatus(value as OrderStatus)}
+                    disabled={isUpdating || order.status === "delivered" || order.status === "cancelled"}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
@@ -287,30 +291,60 @@ const AdminOrderDetails = () => {
                       {order.status === "pending" && (
                         <Button 
                           className="w-full" 
-                          onClick={() => updateOrderStatus("confirmed")}
+                          onClick={() => handleUpdateStatus("confirmed")}
+                          disabled={isUpdating}
                         >
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                          Confirm Order
+                          {isUpdating ? (
+                            <>
+                              <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Confirm Order
+                            </>
+                          )}
                         </Button>
                       )}
                       
                       {order.status === "confirmed" && (
                         <Button 
                           className="w-full"
-                          onClick={() => updateOrderStatus("delivered")}
+                          onClick={() => handleUpdateStatus("delivered")}
+                          disabled={isUpdating}
                         >
-                          <Truck className="mr-2 h-4 w-4" />
-                          Mark as Delivered
+                          {isUpdating ? (
+                            <>
+                              <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <Truck className="mr-2 h-4 w-4" />
+                              Mark as Delivered
+                            </>
+                          )}
                         </Button>
                       )}
                       
                       <Button 
                         variant="destructive" 
                         className="w-full"
-                        onClick={() => updateOrderStatus("cancelled")}
+                        onClick={() => handleUpdateStatus("cancelled")}
+                        disabled={isUpdating}
                       >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Cancel Order
+                        {isUpdating ? (
+                          <>
+                            <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Cancel Order
+                          </>
+                        )}
                       </Button>
                     </>
                   )}

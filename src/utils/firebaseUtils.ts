@@ -1,7 +1,6 @@
-
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, query, where, orderBy } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, query, where, orderBy, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { FoodItem, Category } from "@/types";
+import { FoodItem, Category, Order, OrderStatus } from "@/types";
 
 // Food Items Collection Operations
 export const addFoodItem = async (foodData: Omit<FoodItem, 'id' | 'createdAt'>) => {
@@ -9,7 +8,7 @@ export const addFoodItem = async (foodData: Omit<FoodItem, 'id' | 'createdAt'>) 
     // Add document to Firestore
     const docRef = await addDoc(collection(db, "foodItems"), {
       ...foodData,
-      createdAt: new Date(),
+      createdAt: serverTimestamp(),
     });
 
     return { id: docRef.id, ...foodData, createdAt: new Date() };
@@ -166,6 +165,53 @@ export const getAllCategories = async () => {
     } as Category));
   } catch (error) {
     console.error("Error fetching categories:", error);
+    throw error;
+  }
+};
+
+// Orders Collection Operations
+export const getOrderById = async (orderId: string) => {
+  try {
+    const orderDoc = await getDoc(doc(db, "orders", orderId));
+    
+    if (orderDoc.exists()) {
+      return { id: orderDoc.id, ...orderDoc.data() } as Order;
+    }
+    
+    throw new Error("Order not found");
+  } catch (error) {
+    console.error("Error fetching order:", error);
+    throw error;
+  }
+};
+
+export const getUserOrders = async (userId: string) => {
+  try {
+    const ordersQuery = query(
+      collection(db, "orders"),
+      where("userId", "==", userId),
+      orderBy("createdAt", "desc")
+    );
+    const snapshot = await getDocs(ordersQuery);
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Order));
+  } catch (error) {
+    console.error("Error fetching user orders:", error);
+    throw error;
+  }
+};
+
+export const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
+  try {
+    const orderRef = doc(db, "orders", orderId);
+    await updateDoc(orderRef, { status });
+    
+    return { id: orderId, status };
+  } catch (error) {
+    console.error("Error updating order status:", error);
     throw error;
   }
 };
